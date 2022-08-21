@@ -1,42 +1,43 @@
-from django.http import JsonResponse
-from django.shortcuts import render
-from .models import User
-import logging
-import json
+from django.shortcuts import render, redirect
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
+from django.contrib import messages
 
-log = '%(lineno)d ** %(asctime)s ** %(message)s'
-logging.basicConfig(filename='user_views.log', filemode='a', format=log, level=logging.DEBUG)
+
+def profile(request):
+    return render(request, 'user/profile.html')
 
 
 def registration(request):
-    try:
-        data = json.loads(request.body)
-        if request.method == 'POST':
-            user_registration = User.objects.create(username=data.get("username"),
-                                                    password=data.get("password"),
-                                                    first_name=data.get("first_name"),
-                                                    last_name=data.get("last_name"),
-                                                    email=data.get("email"),
-                                                    phone_number=data.get("phone_number"),
-                                                    location=data.get("location"))
-            return JsonResponse({"message": f"Data save successfully {user_registration.username}",
-                                 "data": {"id": user_registration.id}}, status=201)
-        return JsonResponse({"message": "Method not allow"}, status=400)
-    except Exception as e:
-        logging.exception(e)
-        return JsonResponse({"message": "Unexpected error"}, status=400)
+    if request.method == "POST":
+        user = User.objects.create(username=request.POST.get("username"),
+                                   password=request.POST.get("password"),
+                                   email=request.POST.get("email"),
+                                   first_name=request.POST.get("first_name"),
+                                   last_name=request.POST.get("last_name"),
+                                   phone=request.POST.get("phone"),
+                                   location=request.POST.get("location"))
+        user.save()
+
+        messages.success(request, "Your account has been successfully created.")
+
+        return redirect('login')
+
+    return render(request, 'user/registration.html')
 
 
 def login(request):
-    try:
-        data = json.loads(request.body)
-        if request.method == 'POST':
-            login_user = User.objects.filter(username=data.get("username"), password=data.get("password")).first()
-            if login_user is not None:
-                return JsonResponse({'message': f'User {login_user.username} is successfully login'}, status=200)
-            else:
-                return JsonResponse({'message': 'Invalid username/password'}, status=200)
-        return JsonResponse({'message': 'Method not allow'}, status=400)
-    except Exception as e:
-        logging.exception(e)
-        return JsonResponse({'message': 'Unexpected error'}, status=400)
+    if request.method == "POST":
+        user = authenticate(request, username=request.POST.get('username'), password=request.POST.get('password'))
+        if user is not None:
+            request.user = user
+            first_name = user.first_name
+            return render(request, "user/profile.html", {"first_name": first_name})
+        else:
+            messages.error(request, "Bad Credential")
+            return redirect('profile')
+    return render(request, 'user/login.html')
+
+
+def logout(request):
+    return render(request, 'user/logout.html')
